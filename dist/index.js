@@ -2,15 +2,15 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import path from "path";
-import { db, admin } from "./firebase.js";
+import { db, admin, bucket } from "./firebase.js";
 import { fileURLToPath } from "url";
 import { RecaptchaEnterpriseServiceClient } from "@google-cloud/recaptcha-enterprise";
 import { verifyRecaptcha } from "./src/utils/verifyRecaptcha.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Load .env (adjust path if needed)
 dotenv.config({ path: path.resolve(__dirname, "../.env.staging") });
 const app = express();
+// bucket is now imported from firebase.js, no need to redeclare
 // Allowed origins
 const allowedOrigins = [
     "http://localhost:5173",
@@ -26,7 +26,6 @@ app.use(cors({
     methods: ["GET", "POST", "OPTIONS"],
 }));
 app.use(express.json());
-// Initialize reCAPTCHA client
 const recaptchaClient = new RecaptchaEnterpriseServiceClient();
 // Contact route
 app.post("/contact", async (req, res) => {
@@ -42,7 +41,6 @@ app.post("/contact", async (req, res) => {
             score: result.score,
         });
     }
-    // Save to Firestore
     const docRef = await db.collection("appointments").add({
         name,
         email,
@@ -52,9 +50,36 @@ app.post("/contact", async (req, res) => {
     });
     res.json({ message: "Success", id: docRef.id });
 });
-app.use("/images", express.static(path.join(__dirname, "assets/images")));
+// Get signed URL for an image from Firebase Storage
+app.get("/images/:filename", async (req, res) => {
+    try {
+        const { filename } = req.params;
+        const file = bucket.file(`images/${filename}`);
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+            return res.status(404).json({ message: "Image not found" });
+        }
+        // Generate a signed URL (valid for 1 hour)
+        const [url] = await file.getSignedUrl({
+            action: 'read',
+            expires: Date.now() + 60 * 60 * 1000, // 1 hour
+        });
+        // Redirect to the signed URL
+        res.redirect(url);
+    }
+    catch (error) {
+        console.error("Error fetching image:", error);
+        res.status(500).json({ message: "Error fetching image" });
+    }
+});
+// Alternative: Get public URL (if bucket is public)
+app.get("/images/public/:filename", (req, res) => {
+    const { filename } = req.params;
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/images/${filename}`;
+    res.redirect(publicUrl);
+});
 app.get("/", (req, res) => res.send("🚀 Backend is running"));
-// Start server
 const PORT = process.env.BACKEND_PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
 export default app;
