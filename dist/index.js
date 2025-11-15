@@ -1,17 +1,10 @@
 import express from "express";
-import dotenv from "dotenv";
 import cors from "cors";
-import path from "path";
 import { db, admin, bucket } from "./firebase.js";
-import { fileURLToPath } from "url";
 import { RecaptchaEnterpriseServiceClient } from "@google-cloud/recaptcha-enterprise";
 import { verifyRecaptcha } from "./src/utils/verifyRecaptcha.js";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env.staging") });
 const app = express();
-// bucket is now imported from firebase.js, no need to redeclare
-// Allowed origins
+// --- Allowed origins for CORS ---
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
@@ -26,13 +19,13 @@ app.use(cors({
     methods: ["GET", "POST", "OPTIONS"],
 }));
 app.use(express.json());
+// --- Initialize reCAPTCHA client ---
 const recaptchaClient = new RecaptchaEnterpriseServiceClient();
-// Contact route
+// --- Contact route ---
 app.post("/contact", async (req, res) => {
     const { name, email, phone, message, recaptchaToken } = req.body;
-    if (!recaptchaToken) {
+    if (!recaptchaToken)
         return res.status(400).json({ message: "Missing reCAPTCHA token" });
-    }
     const result = await verifyRecaptcha(recaptchaToken, "contact_form");
     if (!result.valid) {
         return res.status(400).json({
@@ -50,22 +43,18 @@ app.post("/contact", async (req, res) => {
     });
     res.json({ message: "Success", id: docRef.id });
 });
-// Get signed URL for an image from Firebase Storage
+// --- Get signed URL for an image from Firebase Storage ---
 app.get("/images/:filename", async (req, res) => {
     try {
         const { filename } = req.params;
         const file = bucket.file(`images/${filename}`);
-        // Check if file exists
         const [exists] = await file.exists();
-        if (!exists) {
+        if (!exists)
             return res.status(404).json({ message: "Image not found" });
-        }
-        // Generate a signed URL (valid for 1 hour)
         const [url] = await file.getSignedUrl({
-            action: 'read',
+            action: "read",
             expires: Date.now() + 60 * 60 * 1000, // 1 hour
         });
-        // Redirect to the signed URL
         res.redirect(url);
     }
     catch (error) {
@@ -73,7 +62,7 @@ app.get("/images/:filename", async (req, res) => {
         res.status(500).json({ message: "Error fetching image" });
     }
 });
-// Alternative: Get public URL (if bucket is public)
+// --- Optional public URL route ---
 app.get("/images/public/:filename", (req, res) => {
     const { filename } = req.params;
     const publicUrl = `https://storage.googleapis.com/${bucket.name}/images/${filename}`;
