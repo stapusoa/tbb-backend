@@ -3,9 +3,14 @@ import cors from "cors";
 import { db, admin, bucket } from "./firebase.js";
 import { RecaptchaEnterpriseServiceClient } from "@google-cloud/recaptcha-enterprise";
 import { verifyRecaptcha } from "./src/utils/verifyRecaptcha.js";
-import { signUp, signIn, getProfile, updateProfile, deleteUser, } from "./src/lib/firebase/auth.js";
+import { signUp, signIn, signInWithPassword, getProfile, updateProfile, deleteUser, } from "./src/lib/firebase/auth.js";
 import { authenticate } from "./src/utils/authenticate.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import articlesRouter from "./src/routes/articles.js";
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 // --- Allowed origins for CORS ---
 const allowedOrigins = [
     "http://localhost:5173",
@@ -18,13 +23,18 @@ app.use(cors({
             return callback(null, true);
         return callback(new Error("Not allowed by CORS"));
     },
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
 }));
 app.use(express.json());
+// Mount articles router before other routes
+app.use("/articles", articlesRouter);
+app.use("/static-images", express.static(path.join(__dirname, "../assets/images")));
 const recaptchaClient = new RecaptchaEnterpriseServiceClient();
 // --- Public Auth routes ---
 app.post("/auth/signup", signUp);
 app.post("/auth/signin", signIn);
+app.post("/auth/signin-with-password", signInWithPassword);
 // --- Protected routes using authenticate middleware ---
 app.get("/auth/profile/:uid", authenticate, getProfile);
 app.patch("/auth/profile/:uid", authenticate, updateProfile);
@@ -77,6 +87,6 @@ app.get("/images/public/:filename", (req, res) => {
     res.redirect(publicUrl);
 });
 app.get("/", (req, res) => res.send("🚀 Backend is running"));
-const PORT = process.env.BACKEND_PORT || 3000;
+const PORT = process.env.BACKEND_PORT || process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
 export default app;
