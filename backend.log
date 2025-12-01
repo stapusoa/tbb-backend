@@ -1,0 +1,6 @@
+[dotenv@17.2.3] injecting env (10) from .env.staging -- tip: ✅ audit secrets and track compliance: https://dotenvx.com/ops
+✅ Using FIREBASE_SERVICE_ACCOUNT environment variable
+🔥 Firebase initialized
+   Project ID: trubalance-bodyworks
+   Storage Bucket: trubalance-bodyworks.firebasestorage.app
+🚀 Server running at http://localhost:3000

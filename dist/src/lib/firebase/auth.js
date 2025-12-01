@@ -29,6 +29,28 @@ export async function signIn(req, res) {
         res.status(500).json({ message: error.message });
     }
 }
+export async function signInWithPassword(req, res) {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password)
+            return res.status(400).json({ message: "Email and password required" });
+        const firebaseRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, returnSecureToken: true })
+        });
+        const data = await firebaseRes.json();
+        if (!firebaseRes.ok) {
+            return res.status(401).json({ message: data.error?.message || "Invalid credentials" });
+        }
+        // Return both UID and ID token
+        res.json({ uid: data.localId, idToken: data.idToken });
+    }
+    catch (error) {
+        console.error("Error signing in with password:", error);
+        res.status(500).json({ message: error.message });
+    }
+}
 // --- Get profile ---
 export async function getProfile(req, res) {
     try {
